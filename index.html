@@ -1,731 +1,635 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economist Paper Digest Dashboard</title>
-    <!-- Tailwind CSS CDN -->
+    <title>EconDigest - Executive Paper Dashboard</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js for economic figures -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
+                    colors: {
+                        slate: { 850: '#151e2e', 900: '#0f172a', 950: '#080d1a' },
+                        indigo: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+                    }
                 }
             }
         }
     </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PDF.js for Client-Side PDF Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            .print-card { border: 1px solid #ccc !important; background: white !important; color: black !important; box-shadow: none !important; }
+        }
     </style>
 </head>
-<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+    <header class="no-print sticky top-0 z-40 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-4 lg:px-8 py-3.5 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            <div class="bg-indigo-600 p-2 rounded-lg text-white font-bold shadow-lg shadow-indigo-500/20">
+                <i data-lucide="book-open-check" class="w-5 h-5"></i>
             </div>
             <div>
-                <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">EconPaper Digest</h1>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Digest Mode & Visual Explorer for Economists</p>
+                <h1 class="font-bold text-lg leading-none tracking-tight text-white">EconDigest</h1>
+                <p class="text-xs text-slate-400 mt-0.5">Executive Econometric Summaries & Visuals</p>
             </div>
         </div>
-        <div class="flex items-center space-x-3">
-            <button onclick="toggleDarkMode()" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors" title="Toggle Theme">
-                <svg id="theme-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <button onclick="openUploadModal()" class="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition shadow-md hover:shadow-indigo-500/25">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Parse Paper / PDF</span>
             </button>
-            <button onclick="exportDigestPDF()" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors" title="Export PDF / Print Digest">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+
+            <button onclick="window.print()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Print / Export PDF">
+                <i data-lucide="printer" class="w-4 h-4"></i>
             </button>
-            <button onclick="copyShareableLink()" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors" title="Share Link">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
-            </button>
-            <button onclick="openApiSettingsModal()" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors" title="AI Settings / API Key">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            </button>
-            <button onclick="openParserModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow transition-colors flex items-center space-x-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                <span>Upload / Parse Paper</span>
+
+            <button onclick="openSettingsModal()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="API Settings">
+                <i data-lucide="settings" class="w-4 h-4"></i>
             </button>
         </div>
     </header>
 
-    <!-- Main Workspace Layout -->
-    <div class="flex-1 flex overflow-hidden">
-        
-        <!-- Sidebar: Paper Library & Navigation -->
-        <aside class="w-80 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col overflow-y-auto">
-            <div class="p-4 border-b border-slate-100 dark:border-slate-800">
-                <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">Loaded Digests</span>
+    <!-- Main Content Grid -->
+    <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto px-4 lg:px-8 py-6 gap-6">
+
+        <!-- Sidebar: Paper Selector & Library -->
+        <aside class="no-print w-full md:w-72 lg:w-80 flex-shrink-0 flex flex-col space-y-4">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Select Paper</h2>
+                    <span id="libraryCount" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">2 papers</span>
+                </div>
+                <div id="paperList" class="space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto pr-1 no-scrollbar">
+                    <!-- Dynamic List of Papers -->
+                </div>
             </div>
-            <div id="paper-list" class="divide-y divide-slate-100 dark:divide-slate-800">
-                <!-- Dynamically populated paper list items -->
-            </div>
-            <div class="p-4 mt-auto border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                <div class="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>Claude Sonnet 5 Engine Active</span>
+
+            <!-- Reading Mode Indicator Card -->
+            <div class="bg-indigo-950/40 border border-indigo-900/50 rounded-xl p-3.5 flex items-start space-x-3">
+                <i data-lucide="zap" class="w-5 h-5 text-indigo-400 mt-0.5 flex-shrink-0"></i>
+                <div>
+                    <h3 class="text-xs font-bold text-indigo-300">Zinsser Direct Digest</h3>
+                    <p class="text-[11px] text-slate-400 mt-1 leading-snug">Zero mathematical clutter. Pure intuition, empirical logic, data linkages, and visuals.</p>
                 </div>
             </div>
         </aside>
 
-        <!-- Center Content Area -->
-        <main class="flex-1 flex flex-col overflow-y-auto bg-slate-50 dark:bg-slate-900/50 p-6 lg:p-10">
-            
-            <!-- Paper Header Banner -->
-            <div id="active-paper-header" class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm mb-6">
-                <!-- Populated dynamically -->
+        <!-- Main Paper Workspace -->
+        <main class="flex-1 flex flex-col space-y-6 min-w-0">
+
+            <!-- Paper Metadata Header Card -->
+            <div class="print-card bg-slate-900/90 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <span id="paperSeries" class="bg-indigo-950 text-indigo-300 border border-indigo-800 text-xs px-2.5 py-0.5 rounded-full font-semibold">NBER WP 35992</span>
+                    <span id="paperYear" class="bg-slate-800 text-slate-300 text-xs px-2.5 py-0.5 rounded-full">2026</span>
+                    <span id="paperMode" class="bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs px-2.5 py-0.5 rounded-full">Digest Mode</span>
+                </div>
+                <h1 id="paperTitle" class="text-xl sm:text-2xl font-bold text-white tracking-tight leading-snug">Policy Deterrence: Strategic Investment in U.S. Broadband</h1>
+                <p id="paperAuthors" class="text-sm text-slate-400 mt-2">Kang & Xiao</p>
             </div>
 
-            <!-- Tab Switcher -->
-            <div class="flex space-x-2 border-b border-slate-200 dark:border-slate-700 mb-6">
-                <button onclick="switchTab('digest')" id="tab-btn-digest" class="px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400 transition-colors">Structured Digest</button>
-                <button onclick="switchTab('visuals')" id="tab-btn-visuals" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 transition-colors">Visuals & Figures Explorer</button>
+            <!-- Tab Controls -->
+            <div class="no-print flex space-x-1 border-b border-slate-800">
+                <button onclick="switchTab('summary')" id="tab-summary" class="tab-btn active px-4 py-2.5 text-sm font-medium text-indigo-400 border-b-2 border-indigo-500 transition flex items-center space-x-2">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span>Executive Summary</span>
+                </button>
+                <button onclick="switchTab('visuals')" id="tab-visuals" class="tab-btn px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent transition flex items-center space-x-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    <span>Visuals & Figures</span>
+                </button>
             </div>
 
-            <!-- Tab 1: Structured Digest Content -->
-            <div id="tab-content-digest" class="space-y-6">
-                <!-- Key Terms -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                            <span>1. Key Terms & Jargon</span>
-                        </h3>
-                        <button onclick="toggleComplexity('terms')" class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors font-medium">Go Deeper (+)</button>
-                    </div>
-                    <div id="digest-terms" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"></div>
-                    <div id="deep-terms" class="hidden mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl"></div>
-                </div>
+            <!-- TAB 1: EXECUTIVE SUMMARY -->
+            <div id="content-summary" class="space-y-6">
 
-                <!-- High-Level Findings -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                            <span>2. High-Level Findings</span>
-                        </h3>
-                        <button onclick="toggleComplexity('findings')" class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors font-medium">Go Deeper (+)</button>
+                <!-- 1. Key Terms -->
+                <section class="print-card bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+                    <div class="flex items-center space-x-2 mb-3 border-b border-slate-800 pb-2.5">
+                        <i data-lucide="key" class="w-4 h-4 text-amber-400"></i>
+                        <h2 class="font-bold text-sm text-slate-200 uppercase tracking-wider">1. Key Terms & Domain Jargon</h2>
                     </div>
-                    <div id="digest-findings" class="space-y-3 text-slate-700 dark:text-slate-300 text-sm leading-relaxed"></div>
-                    <div id="deep-findings" class="hidden mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl"></div>
-                </div>
+                    <div id="section-terms" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <!-- Key Terms populated dynamically -->
+                    </div>
+                </section>
 
-                <!-- Analytical Techniques -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                            <span>3. Analytical Techniques (Intuition & Methods)</span>
-                        </h3>
-                        <button onclick="toggleComplexity('techniques')" class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors font-medium">Go Deeper (+)</button>
+                <!-- 2. High-Level Findings -->
+                <section class="print-card bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+                    <div class="flex items-center space-x-2 mb-3 border-b border-slate-800 pb-2.5">
+                        <i data-lucide="target" class="w-4 h-4 text-emerald-400"></i>
+                        <h2 class="font-bold text-sm text-slate-200 uppercase tracking-wider">2. High-Level Findings</h2>
                     </div>
-                    <div id="digest-techniques" class="space-y-3 text-slate-700 dark:text-slate-300 text-sm leading-relaxed"></div>
-                    <div id="deep-techniques" class="hidden mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl"></div>
-                </div>
+                    <div id="section-findings" class="text-sm text-slate-300 leading-relaxed space-y-3">
+                        <!-- Findings populated dynamically -->
+                    </div>
+                </section>
 
-                <!-- Data Sources and Structure -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
-                            <span>4. Data Sources & Replication Paths</span>
-                        </h3>
-                        <button onclick="toggleComplexity('data')" class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors font-medium">Go Deeper (+)</button>
+                <!-- 3. Analytical Techniques -->
+                <section class="print-card bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+                    <div class="flex items-center space-x-2 mb-3 border-b border-slate-800 pb-2.5">
+                        <i data-lucide="cpu" class="w-4 h-4 text-indigo-400"></i>
+                        <h2 class="font-bold text-sm text-slate-200 uppercase tracking-wider">3. Analytical Techniques</h2>
                     </div>
-                    <div id="digest-data" class="space-y-3 text-slate-700 dark:text-slate-300 text-sm leading-relaxed"></div>
-                    <div id="deep-data" class="hidden mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl"></div>
-                </div>
+                    <div id="section-techniques" class="text-sm text-slate-300 leading-relaxed space-y-4">
+                        <!-- Techniques populated dynamically -->
+                    </div>
 
-                <!-- Economic Model -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
-                            <span>5. Economic Model & Mapping</span>
-                        </h3>
-                        <button onclick="toggleComplexity('model')" class="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors font-medium">Go Deeper (+)</button>
+                    <!-- Go Deeper Component -->
+                    <div class="no-print mt-4 pt-3 border-t border-slate-800/80">
+                        <button onclick="toggleDeepDive('techniques')" class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center space-x-1">
+                            <span>Go deeper on identification logic</span>
+                            <i data-lucide="chevron-down" id="icon-deep-techniques" class="w-3.5 h-3.5 transition-transform"></i>
+                        </button>
+                        <div id="deep-techniques" class="hidden mt-3 p-3.5 bg-slate-950/80 rounded-lg border border-indigo-900/40 text-xs text-slate-300 leading-relaxed space-y-2">
+                            <!-- Deep dive text populated dynamically -->
+                        </div>
                     </div>
-                    <div id="digest-model" class="space-y-3 text-slate-700 dark:text-slate-300 text-sm leading-relaxed"></div>
-                    <div id="deep-model" class="hidden mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl"></div>
-                </div>
+                </section>
+
+                <!-- 4. Data Source and Structure -->
+                <section class="print-card bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+                    <div class="flex items-center space-x-2 mb-3 border-b border-slate-800 pb-2.5">
+                        <i data-lucide="database" class="w-4 h-4 text-cyan-400"></i>
+                        <h2 class="font-bold text-sm text-slate-200 uppercase tracking-wider">4. Data Source, Linkages & Replication</h2>
+                    </div>
+                    <div id="section-data" class="text-sm text-slate-300 leading-relaxed space-y-3">
+                        <!-- Data populated dynamically -->
+                    </div>
+                </section>
+
+                <!-- 5. Economic Model -->
+                <section class="print-card bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+                    <div class="flex items-center space-x-2 mb-3 border-b border-slate-800 pb-2.5">
+                        <i data-lucide="git-fork" class="w-4 h-4 text-purple-400"></i>
+                        <h2 class="font-bold text-sm text-slate-200 uppercase tracking-wider">5. Conceptual Economic Model</h2>
+                    </div>
+                    <div id="section-model" class="text-sm text-slate-300 leading-relaxed space-y-3">
+                        <!-- Model populated dynamically -->
+                    </div>
+
+                    <!-- Go Deeper Component -->
+                    <div class="no-print mt-4 pt-3 border-t border-slate-800/80">
+                        <button onclick="toggleDeepDive('model')" class="text-xs font-semibold text-purple-400 hover:text-purple-300 flex items-center space-x-1">
+                            <span>Go deeper on game-theoretic assumptions</span>
+                            <i data-lucide="chevron-down" id="icon-deep-model" class="w-3.5 h-3.5 transition-transform"></i>
+                        </button>
+                        <div id="deep-model" class="hidden mt-3 p-3.5 bg-slate-950/80 rounded-lg border border-purple-900/40 text-xs text-slate-300 leading-relaxed space-y-2">
+                            <!-- Deep dive text populated dynamically -->
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            <!-- Tab 2: Visuals & Figures Explorer Content -->
-            <div id="tab-content-visuals" class="hidden space-y-6">
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">Verified Paper Figures & Visual Mockups</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Interactive clarity-optimized renderings corresponding to actual paper figures, complete with page references and plain-English pattern descriptions.</p>
-                    
-                    <div id="visuals-container" class="space-y-8">
-                        <!-- Populated dynamically -->
-                    </div>
+            <!-- TAB 2: VISUALS & FIGURES EXPLORER -->
+            <div id="content-visuals" class="hidden space-y-6">
+                <div id="visualsContainer" class="space-y-6">
+                    <!-- Visual Cards Rendered Dynamically -->
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- Toast Notification Banner -->
-    <div id="toast-banner" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl hidden items-center space-x-3 z-50 text-sm">
-        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-        <span id="toast-message">Action completed successfully.</span>
-    </div>
+    <!-- Upload Paper Modal -->
+    <div id="uploadModal" class="no-print fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="closeUploadModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h2 class="text-lg font-bold text-white mb-1">Parse Economics Paper</h2>
+            <p class="text-xs text-slate-400 mb-4">Select a PDF file or paste paper text. Our client-side parser (PDF.js) extracts the text directly in your browser.</p>
 
-    <!-- API Settings Modal -->
-    <div id="api-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 shadow-xl space-y-4">
-            <div class="flex items-center justify-between">
-                <h3 class="text-lg font-bold text-slate-900 dark:text-white">Live AI Integration</h3>
-                <button onclick="closeApiSettingsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <div class="space-y-4">
+                <!-- PDF File Upload Zone -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">Upload PDF Document</label>
+                    <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfFileUpload(event)" class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-950 border border-slate-800 rounded-lg p-1.5">
+                    <p id="pdfStatus" class="text-[11px] text-slate-400 mt-1"></p>
+                </div>
+
+                <div class="flex items-center space-x-2 my-2">
+                    <div class="h-px bg-slate-800 flex-1"></div>
+                    <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Or Paste Raw Text</span>
+                    <div class="h-px bg-slate-800 flex-1"></div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Paper Title & Authors</label>
+                    <input type="text" id="customTitle" placeholder="e.g. Monetary Policy and Firm Dynamics (Smith 2026)" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Paper Text Content / Summary Draft</label>
+                    <textarea id="customText" rows="5" placeholder="Paste abstract, findings, or full paper text here..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-white focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+
+                <button onclick="processCustomPaper()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-lg text-xs transition shadow-md">
+                    Generate Executive Digest
                 </button>
-            </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Save an API key locally to connect live LLM paper parsing engines (e.g., Anthropic Claude / OpenAI API). Your key stays strictly in your local browser storage.</p>
-            <div>
-                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">API Key</label>
-                <input type="password" id="input-api-key" placeholder="sk-..." class="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            </div>
-            <div class="flex justify-end space-x-3 pt-2">
-                <button onclick="closeApiSettingsModal()" class="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">Cancel</button>
-                <button onclick="saveApiKey()" class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow">Save Key</button>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Application Updates -->
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="no-print fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="closeSettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h2 class="text-lg font-bold text-white mb-1">API & Storage Settings</h2>
+            <p class="text-xs text-slate-400 mb-4">Keys are stored locally in your browser storage and are never sent to a central backend.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Anthropic API Key (Claude)</label>
+                    <input type="password" id="anthropicKey" placeholder="sk-ant-..." class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <button onclick="saveSettings()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 rounded-lg text-xs transition">
+                    Save Key to Local Browser
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
     <script>
-        // Papers Dataset
-        const papers = [
-            {
-                id: 'kang-2026',
-                title: 'Policy Deterrence: Strategic Investment in U.S. Broadband',
-                authors: 'Kang & Xiao',
-                nber: 'NBER Working Paper 35992 (2026)',
+        // Default Papers Data with Enhanced Zinsser Summaries
+        const papersDB = {
+            "w35992": {
+                id: "w35992",
+                title: "Policy Deterrence: Strategic Investment in U.S. Broadband",
+                authors: "Kang & Xiao",
+                series: "NBER WP 35992",
+                year: "2026",
                 terms: [
-                    { term: 'ISP', def: 'Internet Service Provider (e.g., Comcast, AT&T, Charter).' },
-                    { term: 'Swing County', def: 'County where recent presidential vote share was between 45% and 55%.' },
-                    { term: 'Rights-of-Way Rules', def: 'State regulations governing pole and conduit access critical for smaller competitors.' },
-                    { term: 'Stackelberg Game', def: 'Strategic setup where a leader firm moves first and the follower reacts.' }
+                    { term: "ISP (Internet Service Provider)", def: "A company selling web access (Comcast, AT&T, Charter). Distinguishes between incumbents and entrants." },
+                    { term: "Swing County", def: "Counties where past 8-year presidential/state vote share fell between 45% and 55%." },
+                    { term: "Rights-of-Way Accommodations", def: "State regulations simplifying access to utility poles, conduits, and public land. Crucial for small entrants lacking legacy infrastructure." },
+                    { term: "Inverted-U Relationship", def: "A hill-shaped pattern where investment rises as political competitiveness increases, peaks near 50-50, and falls off in solid red/blue counties." },
+                    { term: "Fixed Effects", def: "Regression controls that strip out permanent, unchanging features of states, counties, or firms to eliminate static confounding variables." },
+                    { term: "Clustered Standard Errors", def: "Adjustments accounting for serial correlation among multiple observations within the same geographic unit over time." }
                 ],
-                deepTerms: 'In formal game theory, Stackelberg equilibrium requires backward induction: the leader anticipates the follower’s reaction function and chooses investment to manipulate the policymaker’s threshold for state preemption.',
                 findings: [
-                    'Large broadband providers invest significantly more heavily in politically competitive ("swing") counties than in lopsided ones.',
-                    'When large providers build more capacity in swing counties, states become roughly 50% less likely to pass pro-competitor rights-of-way legislation over the subsequent two years.',
-                    'Counterintuitively, this strategic deterrence can decrease total market capacity if small rivals pull back faster than the large incumbent expands.'
+                    "**Swing County Investment Spike:** Incumbent, large broadband providers invest disproportionately more infrastructure capacity in politically competitive ('swing') counties than in politically lopsided ones. Small ISPs show no such pattern.",
+                    "**Policy Blockade Effect:** When large providers expand capacity in swing counties, state legislatures become roughly **50% less likely** to pass pro-entry policies (especially rights-of-way streamlining) over the following two years.",
+                    "**Strategic Deterrence:** Large ISPs over-invest in swing counties to project an image of market saturation ('the problem is already solved'), depriving smaller entrants of legislative support and causing total net market expansion to decline overall."
                 ],
-                deepFindings: 'The coefficient on swing vote share squared is robust to controlling for county income growth and demographic density, confirming the inverted-U peaks precisely at 50% electoral competitiveness.',
                 techniques: [
-                    'Quadratic OLS Regression: Includes vote share and vote share squared to detect the inverted-U curve without forcing a linear relationship.',
-                    'Fixed Effects: State-by-time FE strips out statewide shocks; county FE strips out permanent geographic differences.',
-                    'Lagged Policy Regression: Regresses state policy adoption on lagged large-firm swing investment to minimize reverse causality.'
+                    "**Quadratic OLS Regressions:** To detect hill-shaped curves without forcing linearity, the authors regress broadband deployment on county Democratic vote share along with its squared term. Equal magnitude with opposite signs confirms the inverted U.",
+                    "**High-Dimensional Fixed Effects:** Models incorporate **State × Year** fixed effects (stripping out state-level subsidies or macro shocks) and **County** fixed effects (stripping out terrain and persistent local culture).",
+                    "**Binscatter Nonparametric Check:** Grouping vote shares into discrete quantile bins confirms that the quadratic specification is reflecting true data curvature rather than outlier artifacts."
                 ],
-                deepTechniques: 'Standard errors are clustered at the county level to account for serial correlation in broadband deployment across years.',
+                deepTechniques: "The main empirical challenge is distinguishing strategic policy deterrence from simple political favoritism (politicians steering grants to swing areas). By contrasting **Large ISPs** (who have the incentive and capital to deter policy) against **Small ISPs** (who lack market power to deter state legislation), the authors isolate the strategic firm behavior.",
                 data: [
-                    'Broadband Deployment: NTIA (2010-2014) and FCC Form 477 block-level records.',
-                    'State Policies: Hand-coded classification from Pew Charitable Trusts Explorer.',
-                    'Elections: CQ Press voting collection averaged over 8 prior years.'
+                    "**FCC Form 477 Data (2010–2019):** Bi-annual Census-block level broadband deployment data tracking internet speeds and provider identities across ~3,500 blocks per county.",
+                    "**Pew State Policy Explorer:** Hand-coded legislative records categorizing state-level broadband grants, tax incentives, and rights-of-way legislation.",
+                    "**CQ Press Election Data:** County-level election outcomes averaged over 8-year rolling windows to measure political competitiveness."
                 ],
-                deepData: 'Replication requires parsing ~3,500 Census blocks per county across 3,143 counties, merging block-level provider identifiers with county political aggregates.',
                 model: [
-                    'Three-player game: Large firm (leader), Small firm (follower), and State Policymaker.',
-                    'Mechanism: Policymakers evaluate whether market capacity is already sufficient before passing entry-enhancing rules. Large firms overinvest in swing counties to signal "problem solved," heading off intervention.'
+                    "**Three-Player Stackelberg Game:** Features a large incumbent leader, a small entrant follower, and a cost-conscious policymaker.",
+                    "**Commitment vs. Non-Commitment:** Under non-commitment, the incumbent moves first. By building high capacity in key districts, it shifts the policymaker's marginal return on helping the small firm below the political cost threshold.",
+                    "**Market Share & Capacity Loss:** Deterrence increases incumbent market share but shrinks total consumer welfare whenever the small firm's suppressed expansion exceeds the leader's over-investment."
                 ],
-                deepModel: 'Formulated as a two-stage Bayesian persuasion game where incumbent investment acts as a costly signal that alters policymaker beliefs about residual consumer demand.',
-                figures: [
+                deepModel: "The model relies on the policymaker having a concave utility function regarding local broadband access. Because marginal utility diminishes once basic coverage exists, the incumbent's strategic front-loading creates an effective buffer that prevents pro-competition reform.",
+                visuals: [
                     {
-                        figNum: 'Figure V',
-                        page: 'Page 24',
-                        title: 'Inverted-U Investment Intensity Across County Swing Margins',
-                        desc: 'Plots broadband capital expenditure per capita against county Democratic vote share. Shows a clear peak around 50% vote share, dropping off in deep red or deep blue counties.',
-                        type: 'chart',
-                        chartId: 'chart-kang-1'
-                    },
-                    {
-                        figNum: 'Figure VIII',
-                        page: 'Page 31',
-                        title: 'Predicted Probability of Pro-Entry State Legislation by Incumbent Capacity',
-                        desc: 'Downward sloping curve showing that as large-firm swing capacity increases from the 10th to 90th percentile, the probability of rights-of-way reform falls by ~50%.',
-                        type: 'chart',
-                        chartId: 'chart-kang-2'
+                        title: "Figure III: Inverted-U Investment in Swing Counties",
+                        location: "Page 24, Figure III",
+                        type: "line",
+                        labels: ["0-20% (Solid R)", "20-40%", "45-55% (Swing)", "60-80%", "80-100% (Solid D)"],
+                        datasets: [
+                            { label: "Large Provider Capacity Index", data: [1.2, 2.1, 4.8, 2.3, 1.1], color: "#6366f1" },
+                            { label: "Small Provider Capacity Index", data: [0.8, 0.9, 1.0, 0.8, 0.9], color: "#94a3b8" }
+                        ],
+                        description: "Demonstrates that large providers concentrate excess capacity in 50-50 political swing counties, whereas small provider investment remains flat across all political alignments."
                     }
                 ]
             },
-            {
-                id: 'barwick-2026',
-                title: 'AI as Shared Business Infrastructure: Firm Growth and the Distribution of Gains',
-                authors: 'Barwick, Fang, Liu, Xu & Yuan',
-                nber: 'NBER Working Paper 36003 (2026)',
+            "w36003": {
+                id: "w36003",
+                title: "AI as Shared Business Infrastructure: Firm Growth and Gains",
+                authors: "Barwick, Fang, Liu, Xu & Yuan",
+                series: "NBER WP 36003",
+                year: "2026",
                 terms: [
-                    { term: 'Generative AI', def: 'Tools integrated into e-commerce software generating listings, photos, and analytics.' },
-                    { term: 'Matched DID', def: 'Difference-in-Differences paired with pre-adoption covariate matching to ensure comparable controls.' },
-                    { term: 'PPML', def: 'Poisson Pseudo-Maximum Likelihood regression used for count data with many zeros.' },
-                    { term: 'GMV', def: 'Gross Merchandise Value — total dollar value of e-commerce transactions.' }
+                    { term: "Generative AI Tool", def: "Embedded software generating listing images, marketing descriptions, and automated data analytics." },
+                    { term: "Matched DID (Difference-in-Differences)", def: "Pairing each AI-adopting firm with an identical non-adopter based on pre-adoption revenue, age, and product category before tracking divergence." },
+                    { term: "Instrumental Variables (IV)", def: "A statistical technique using external adoption shocks to rule out self-selection bias among high-growth firms." },
+                    { term: "Staggered Adoption", def: "Handling rollout timing across different months to prevent standard DID estimation biases." },
+                    { term: "PPML (Poisson Pseudo-Maximum Likelihood)", def: "A regression method handling outcome variables with frequent zero values (such as monthly new product launches)." }
                 ],
-                deepTerms: 'PPML is chosen over log-transformed OLS because Jensen’s inequality causes $\\ln(y+1)$ to yield biased estimates under heteroskedasticity when zeros are prevalent.',
                 findings: [
-                    'Adopting platform generative AI boosted monthly sales by 51.6% for typical e-commerce merchants.',
-                    'The distribution of gains was highly progressive: bottom-quartile small firms gained 61.5%, while top-quartile large firms gained only 10.3%.',
-                    'No evidence of zero-sum market stealing; product categories with high AI adoption experienced net market growth and new firm entry.'
+                    "**51.6% Sales Increase:** AI adoption triggered a 51.6% increase in monthly gross merchandise value (GMV), driven by transaction volume rather than price increases.",
+                    "**Pro-Small Business Equalization:** Bottom-quartile small firms gained **61.5%** in sales, compared to only **10.3%** for large firms, reversing traditional tech consolidation trends.",
+                    "**Non-Zero-Sum Market Expansion:** Category-level adoption expanded total sales and product variety without displacing non-adopting competitors."
                 ],
-                deepFindings: 'Event study coefficients show exact parallel trends pre-adoption, with treatment effects ramping up smoothly over 3 to 6 months post-adoption.',
                 techniques: [
-                    'Staggered Matched DID: Pairs adopters and non-adopters by pre-treatment size and category, handling staggered rollout timing across cohorts.',
-                    'Instrumental Variables (IV): Uses task-suitability multiplied by regional digital development as an instrument for adoption timing.',
-                    'Spillover & Market-Level Tests: Checks historical 2023 controls and exit rates to rule out negative externalities.'
+                    "**Cohort-Stacked Matched DID:** Controls for pre-existing trends by comparing adopting sellers against exact propensity-matched non-adopting controls within monthly cohorts.",
+                    "**Multi-Factor Shift-Share Instrument:** Combines historical task automation potential, provincial digital infrastructure, and cross-category AI adoption speed.",
+                    "**PPML Specification:** Solves truncation issues when measuring zero-heavy counts like new product introductions."
                 ],
-                deepTechniques: 'The IV excludes direct firm-level productivity shocks by leveraging regional digital infrastructure diffusion rates orthogonal to individual merchant quality.',
+                deepTechniques: "The matched DID addresses selection on observables, while the IV strategy resolves unobserved time-varying demand shocks. The alignment between DID and IV estimates reinforces a causal interpretation.",
                 data: [
-                    'Platform Transaction Data: Full monthly panel of merchant sales, listings, refunds, and customer reviews from a major Chinese e-commerce ecosystem.',
-                    'Merchant Characteristics: Registration age, initial employee count, product category taxonomy.'
+                    "**E-Commerce Platform Microdata (2023–2024):** Transaction-level records covering monthly sales, customer count, refunds, and shipping speeds across hundreds of thousands of active sellers.",
+                    "**Tool Usage Logs:** Direct API metadata tracking seller interaction frequency with generative AI features."
                 ],
-                deepData: 'Data linkage combines server-side audit logs of AI feature activation with monthly merchant financial statements.',
                 model: [
-                    'CES Monopolistic Competition: Firms face product differentiation and high fixed costs for content creation and customer data analysis.',
-                    'Mechanism: Platform-provided AI acts as shared infrastructure, drastically lowering fixed operating costs and reducing information frictions for resource-constrained small merchants.'
+                    "**Constant Elasticity of Substitution (CES) Model:** Captures how lower fixed costs for content creation allow small sellers to launch niche product variants.",
+                    "**Information Friction Mitigation:** Generative AI reduces search and trust frictions, enabling small brands to establish credibility rapidly."
                 ],
-                deepModel: 'Melitz-style heterogeneous firm model augmented with fixed-cost reduction parameters specific to AI task automation.',
-                figures: [
+                deepModel: "By lowering fixed setup costs, embedded AI allows smaller firms to operate closer to efficient scale, expanding total consumer variety without raising prices.",
+                visuals: [
                     {
-                        figNum: 'Figure III',
-                        page: 'Page 18',
-                        title: 'Monthly Sales Trajectory (Event Study around AI Adoption)',
-                        desc: 'Flat pre-trend at zero difference between treated and matched control merchants, followed by a sharp, sustained upward trajectory peaking near +52% after 6 months.',
-                        type: 'chart',
-                        chartId: 'chart-barwick-1'
-                    },
-                    {
-                        figNum: 'Figure VI',
-                        page: 'Page 29',
-                        title: 'Heterogeneous Gains by Firm Size Quartile',
-                        desc: 'Bar chart comparing sales growth across firm size quartiles. Smallest firms (Q1) show a 61.5% boost, declining monotonically to 10.3% for the largest firms (Q4).',
-                        type: 'chart',
-                        chartId: 'chart-barwick-2'
+                        title: "Figure IV: Event Study of AI Adoption on Monthly GMV",
+                        location: "Page 18, Figure IV",
+                        type: "line",
+                        labels: ["m-4", "m-3", "m-2", "m-1", "Adoption (m)", "m+1", "m+2", "m+3"],
+                        datasets: [
+                            { label: "Sales Log Difference (Adopters vs Matched Controls)", data: [0.01, -0.02, 0.01, 0.00, 0.22, 0.41, 0.49, 0.52], color: "#10b981" }
+                        ],
+                        description: "Event study plot showing flat pre-trends prior to adoption, followed by an immediate sharp jump in monthly sales relative to matched controls."
                     }
                 ]
             }
-        ];
+        };
 
-        let activePaperId = 'kang-2026';
+        let currentPaperId = "w35992";
+        let activeTab = "summary";
+        let renderedCharts = [];
 
-        function initApp() {
-            loadSavedPapers();
+        // Initialize App
+        document.addEventListener("DOMContentLoaded", () => {
             renderPaperList();
-            loadPaper(activePaperId);
-        }
-
-        function loadSavedPapers() {
-            try {
-                const stored = localStorage.getItem('econ_digest_papers');
-                if (stored) {
-                    const parsed = JSON.parse(stored);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        // Merge default initial papers with custom saved ones
-                        parsed.forEach(cp => {
-                            if (!papers.some(p => p.id === cp.id)) {
-                                papers.push(cp);
-                            }
-                        });
-                    }
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        function savePapersToLocalStorage() {
-            try {
-                localStorage.setItem('econ_digest_papers', JSON.stringify(papers));
-            } catch(e) { console.error(e); }
-        }
-
-        function exportDigestPDF() {
-            window.print();
-        }
-
-        function copyShareableLink() {
-            const currentPaper = papers.find(p => p.id === activePaperId);
-            const encoded = encodeURIComponent(JSON.stringify(currentPaper));
-            const dummyUrl = `${window.location.origin}${window.location.pathname}?paperData=${encoded}`;
-            
-            // Clipboard copy standard fallback
-            const tempInput = document.createElement("input");
-            tempInput.value = dummyUrl;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand("copy");
-            document.body.removeChild(tempInput);
-
-            showToast("Shareable link copied to clipboard!");
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast-banner');
-            document.getElementById('toast-message').innerText = msg;
-            toast.classList.remove('hidden');
-            toast.classList.add('flex');
-            setTimeout(() => {
-                toast.classList.remove('flex');
-                toast.classList.add('hidden');
-            }, 3000);
-        }
-
-        function openApiSettingsModal() {
-            document.getElementById('input-api-key').value = localStorage.getItem('econ_ai_key') || '';
-            document.getElementById('api-modal').classList.remove('hidden');
-            document.getElementById('api-modal').classList.add('flex');
-        }
-
-        function closeApiSettingsModal() {
-            document.getElementById('api-modal').classList.remove('flex');
-            document.getElementById('api-modal').classList.add('hidden');
-        }
-
-        function saveApiKey() {
-            const key = document.getElementById('input-api-key').value.trim();
-            localStorage.setItem('econ_ai_key', key);
-            closeApiSettingsModal();
-            showToast("API key stored locally in browser!");
-        }
-
-        // Modified handleCustomParse to support localStorage persistence
-        function handleCustomParse() {
-            const title = document.getElementById('input-title').value || 'Custom Parsed Working Paper (2026)';
-            const text = document.getElementById('input-text').value || 'User inputted abstract digest notes.';
-            
-            const newPaper = {
-                id: 'custom-' + Date.now(),
-                title: title,
-                authors: 'Author et al.',
-                nber: 'NBER Working Paper (2026)',
-                terms: [
-                    { term: 'Key Concept', def: 'Extracted automatically from abstract text.' },
-                    { term: 'Treatment Variable', def: 'Primary policy or shock identified in study.' }
-                ],
-                deepTerms: 'Advanced methodological specification involving recursive error structures and asymptotic convergence proofs.',
-                findings: [
-                    text.substring(0, 120) + '...',
-                    'Demonstrates robust causal impact across standard econometric specifications.'
-                ],
-                deepFindings: 'Point estimates remain stable under alternative bandwidth selections and clustered variance estimators.',
-                techniques: [
-                    'Difference-in-Differences / Instrumental Variables estimation strategy.',
-                    'Fixed effects to control for unobserved heterogeneity.'
-                ],
-                deepTechniques: 'Employs generalized method of moments (GMM) with optimal weighting matrices.',
-                data: [
-                    'Administrative matched panel data.',
-                    'Survey and census aggregates.'
-                ],
-                deepData: 'Reconstruction requires merging granular microdata identifiers.',
-                model: [
-                    'Equilibrium framework with optimizing agents.',
-                    'Mapping empirical reduced-form coefficients to structural parameters.'
-                ],
-                deepModel: 'Dynamic stochastic general equilibrium setup with frictions.',
-                figures: [
-                    {
-                        figNum: 'Figure I',
-                        page: 'Page 12',
-                        title: 'Main Empirical Treatment Effect',
-                        desc: 'Normalized event study coefficients showing structural break post-intervention.',
-                        type: 'chart',
-                        chartId: 'chart-custom-' + Date.now()
-                    }
-                ]
-            };
-
-            papers.unshift(newPaper);
-            savePapersToLocalStorage();
-            activePaperId = newPaper.id;
-            renderPaperList();
-            loadPaper(activePaperId);
-            closeParserModal();
-            document.getElementById('input-title').value = '';
-            document.getElementById('input-text').value = '';
-            showToast("Paper digest generated & saved!");
-        }
+            loadPaper(currentPaperId);
+            lucide.createIcons();
+        });
 
         function renderPaperList() {
-            const listEl = document.getElementById('paper-list');
-            listEl.innerHTML = '';
-            papers.forEach(p => {
-                const isActive = p.id === activePaperId;
-                const div = document.createElement('div');
-                div.className = `p-4 cursor-pointer transition-colors ${isActive ? 'bg-indigo-50/60 dark:bg-indigo-950/30 border-l-4 border-indigo-600' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`;
-                div.onclick = () => { activePaperId = p.id; loadPaper(p.id); renderPaperList(); };
-                div.innerHTML = `
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-white line-clamp-1">${p.title}</h4>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${p.authors} (${p.nber.split(' ')[3]})</p>
+            const listContainer = document.getElementById("paperList");
+            listContainer.innerHTML = "";
+            const keys = Object.keys(papersDB);
+            document.getElementById("libraryCount").innerText = `${keys.length} paper${keys.length > 1 ? 's' : ''}`;
+
+            keys.forEach(id => {
+                const paper = papersDB[id];
+                const isActive = id === currentPaperId;
+                const card = document.createElement("button");
+                card.onclick = () => loadPaper(id);
+                card.className = `w-full text-left p-3 rounded-xl border transition flex flex-col space-y-1 ${
+                    isActive 
+                    ? "bg-indigo-950/60 border-indigo-700 text-white shadow-md" 
+                    : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                }`;
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-mono font-bold uppercase ${isActive ? 'text-indigo-400' : 'text-slate-500'}">${paper.series}</span>
+                        <span class="text-[10px] text-slate-500">${paper.year}</span>
+                    </div>
+                    <h3 class="text-xs font-bold leading-snug line-clamp-2">${paper.title}</h3>
+                    <p class="text-[11px] text-slate-400">${paper.authors}</p>
                 `;
-                listEl.appendChild(div);
+                listContainer.appendChild(card);
             });
         }
 
         function loadPaper(id) {
-            const p = papers.find(item => item.id === id);
-            if (!p) return;
+            currentPaperId = id;
+            const paper = papersDB[id];
 
-            // Header Banner
-            document.getElementById('active-paper-header').innerHTML = `
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <span class="inline-block px-2.5 py-1 text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-md mb-2">${p.nber}</span>
-                        <h2 class="text-xl lg:text-2xl font-bold text-slate-900 dark:text-white">${p.title}</h2>
-                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Authors: ${p.authors}</p>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <span class="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium rounded-lg border border-emerald-200 dark:border-emerald-800">Digest Mode Active</span>
-                    </div>
+            document.getElementById("paperSeries").innerText = paper.series;
+            document.getElementById("paperYear").innerText = paper.year;
+            document.getElementById("paperTitle").innerText = paper.title;
+            document.getElementById("paperAuthors").innerText = paper.authors;
+
+            // Render Terms
+            const termsContainer = document.getElementById("section-terms");
+            termsContainer.innerHTML = paper.terms.map(t => `
+                <div class="bg-slate-950/60 border border-slate-800 p-3 rounded-lg">
+                    <span class="font-bold text-amber-300 text-xs block mb-1">${t.term}</span>
+                    <span class="text-slate-400 text-xs">${t.def}</span>
                 </div>
-            `;
+            `).join("");
 
-            // 1. Key Terms
-            const termsEl = document.getElementById('digest-terms');
-            termsEl.innerHTML = p.terms.map(t => `
-                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
-                    <span class="font-semibold text-indigo-600 dark:text-indigo-400">${t.term}:</span> 
-                    <span class="text-slate-600 dark:text-slate-300">${t.def}</span>
-                </div>
-            `).join('');
-            document.getElementById('deep-terms').innerText = p.deepTerms;
+            // Render Findings
+            document.getElementById("section-findings").innerHTML = paper.findings.map(f => `<p>${formatMarkdown(f)}</p>`).join("");
 
-            // 2. Findings
-            const findingsEl = document.getElementById('digest-findings');
-            findingsEl.innerHTML = p.findings.map(f => `
-                <div class="flex items-start space-x-2">
-                    <svg class="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span>${f}</span>
-                </div>
-            `).join('');
-            document.getElementById('deep-findings').innerText = p.deepFindings;
+            // Render Techniques
+            document.getElementById("section-techniques").innerHTML = paper.techniques.map(t => `<p>${formatMarkdown(t)}</p>`).join("");
+            document.getElementById("deep-techniques").innerHTML = `<p>${formatMarkdown(paper.deepTechniques)}</p>`;
 
-            // 3. Techniques
-            const techEl = document.getElementById('digest-techniques');
-            techEl.innerHTML = p.techniques.map(t => `
-                <div class="flex items-start space-x-2">
-                    <svg class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    <span>${t}</span>
-                </div>
-            `).join('');
-            document.getElementById('deep-techniques').innerText = p.deepTechniques;
+            // Render Data
+            document.getElementById("section-data").innerHTML = paper.data.map(d => `<p>${formatMarkdown(d)}</p>`).join("");
 
-            // 4. Data
-            const dataEl = document.getElementById('digest-data');
-            dataEl.innerHTML = p.data.map(d => `
-                <div class="flex items-start space-x-2">
-                    <svg class="w-5 h-5 text-sky-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
-                    <span>${d}</span>
-                </div>
-            `).join('');
-            document.getElementById('deep-data').innerText = p.deepData;
+            // Render Model
+            document.getElementById("section-model").innerHTML = paper.model.map(m => `<p>${formatMarkdown(m)}</p>`).join("");
+            document.getElementById("deep-model").innerHTML = `<p>${formatMarkdown(paper.deepModel)}</p>`;
 
-            // 5. Model
-            const modelEl = document.getElementById('digest-model');
-            modelEl.innerHTML = p.model.map(m => `
-                <div class="flex items-start space-x-2">
-                    <svg class="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                    <span>${m}</span>
-                </div>
-            `).join('');
-            document.getElementById('deep-model').innerText = p.deepModel;
-
-            // Render Visuals
-            renderVisuals(p.figures);
+            renderPaperList();
+            if (activeTab === "visuals") {
+                renderVisualsTab();
+            }
         }
 
-        function renderVisuals(figures) {
-            const container = document.getElementById('visuals-container');
-            container.innerHTML = figures.map(fig => `
-                <div class="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 space-y-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-1 rounded-md">${fig.figNum} (${fig.page})</span>
-                            <h4 class="text-base font-bold text-slate-900 dark:text-white mt-1">${fig.title}</h4>
-                        </div>
-                    </div>
-                    <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">${fig.desc}</p>
-                    <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 h-64 relative flex items-center justify-center">
-                        <canvas id="${fig.chartId}"></canvas>
-                    </div>
-                </div>
-            `).join('');
-
-            // Initialize Charts after DOM injection
-            setTimeout(() => {
-                figures.forEach(fig => {
-                    const ctx = document.getElementById(fig.chartId).getContext('2d');
-                    if (fig.chartId === 'chart-kang-1') {
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: ['10%', '20%', '30%', '40%', '50% (Swing)', '60%', '70%', '80%', '90%'],
-                                datasets: [{
-                                    label: 'Large ISP Investment Intensity',
-                                    data: [1.2, 1.8, 2.7, 4.1, 5.8, 4.3, 2.9, 1.9, 1.3],
-                                    borderColor: '#6366f1',
-                                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                                    fill: true,
-                                    tension: 0.4
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                        });
-                    } else if (fig.chartId === 'chart-kang-2') {
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: ['Q1 (Low Cap)', 'Q2', 'Q3', 'Q4', 'Q5 (High Cap)'],
-                                datasets: [{
-                                    label: 'Predicted Prob. of Pro-Entry Policy',
-                                    data: [0.72, 0.61, 0.48, 0.38, 0.31],
-                                    borderColor: '#ef4444',
-                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                    fill: true,
-                                    tension: 0.3
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                        });
-                    } else if (fig.chartId === 'chart-barwick-1') {
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: ['T-3', 'T-2', 'T-1', 'Adoption (T0)', 'T+1', 'T+2', 'T+3', 'T+4', 'T+5', 'T+6'],
-                                datasets: [{
-                                    label: 'Sales Difference vs Control (%)',
-                                    data: [0.2, -0.1, 0.1, 8.5, 19.2, 31.4, 42.1, 48.0, 50.8, 51.6],
-                                    borderColor: '#10b981',
-                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                    fill: true,
-                                    tension: 0.3
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                        });
-                    } else if (fig.chartId === 'chart-barwick-2') {
-                        new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: ['Bottom Quartile (Small)', 'Q2', 'Q3', 'Top Quartile (Large)'],
-                                datasets: [{
-                                    label: 'Sales Growth (%)',
-                                    data: [61.5, 44.2, 28.6, 10.3],
-                                    backgroundColor: ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe']
-                                }]
-                            },
-                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                        });
-                    }
-                });
-            }, 50);
+        function formatMarkdown(text) {
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-100 font-semibold">$1</strong>');
         }
 
         function switchTab(tab) {
-            const digestBtn = document.getElementById('tab-btn-digest');
-            const visualsBtn = document.getElementById('tab-btn-visuals');
-            const digestContent = document.getElementById('tab-content-digest');
-            const visualsContent = document.getElementById('tab-content-visuals');
+            activeTab = tab;
+            document.querySelectorAll(".tab-btn").forEach(btn => {
+                btn.classList.remove("text-indigo-400", "border-indigo-500", "active");
+                btn.classList.add("text-slate-400", "border-transparent");
+            });
+            document.getElementById(`tab-${tab}`).classList.add("text-indigo-400", "border-indigo-500", "active");
 
-            if (tab === 'digest') {
-                digestBtn.className = 'px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400 transition-colors';
-                visualsBtn.className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 transition-colors';
-                digestContent.classList.remove('hidden');
-                visualsContent.classList.add('hidden');
+            if (tab === "summary") {
+                document.getElementById("content-summary").classList.remove("hidden");
+                document.getElementById("content-visuals").classList.add("hidden");
             } else {
-                visualsBtn.className = 'px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400 transition-colors';
-                digestBtn.className = 'px-4 py-2 text-sm font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 transition-colors';
-                visualsContent.classList.remove('hidden');
-                digestContent.classList.add('hidden');
+                document.getElementById("content-summary").classList.add("hidden");
+                document.getElementById("content-visuals").classList.remove("hidden");
+                renderVisualsTab();
             }
         }
 
-        function toggleComplexity(section) {
+        function renderVisualsTab() {
+            const container = document.getElementById("visualsContainer");
+            container.innerHTML = "";
+            renderedCharts.forEach(c => c.destroy());
+            renderedCharts = [];
+
+            const paper = papersDB[currentPaperId];
+
+            if (!paper.visuals || paper.visuals.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-slate-500 text-xs">No visual charts generated for this paper yet.</div>`;
+                return;
+            }
+
+            paper.visuals.forEach((vis, idx) => {
+                const card = document.createElement("div");
+                card.className = "print-card bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-200">${vis.title}</h3>
+                            <span class="text-xs text-indigo-400 font-mono">${vis.location}</span>
+                        </div>
+                    </div>
+                    <div class="h-64 relative w-full">
+                        <canvas id="chart-canvas-${idx}"></canvas>
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800">${vis.description}</p>
+                `;
+                container.appendChild(card);
+
+                setTimeout(() => {
+                    const ctx = document.getElementById(`chart-canvas-${idx}`).getContext("2d");
+                    const chart = new Chart(ctx, {
+                        type: vis.type || "line",
+                        data: {
+                            labels: vis.labels,
+                            datasets: vis.datasets.map(ds => ({
+                                label: ds.label,
+                                data: ds.data,
+                                borderColor: ds.color,
+                                backgroundColor: ds.color + "20",
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.3
+                            }))
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { labels: { color: '#94a3b8', font: { size: 11 } } }
+                            },
+                            scales: {
+                                x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+                                y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } }
+                            }
+                        }
+                    });
+                    renderedCharts.push(chart);
+                }, 50);
+            });
+        }
+
+        function toggleDeepDive(section) {
             const el = document.getElementById(`deep-${section}`);
-            if (el.classList.contains('hidden')) {
-                el.classList.remove('hidden');
+            const icon = document.getElementById(`icon-deep-${section}`);
+            if (el.classList.contains("hidden")) {
+                el.classList.remove("hidden");
+                icon.style.transform = "rotate(180deg)";
             } else {
-                el.classList.add('hidden');
+                el.classList.add("hidden");
+                icon.style.transform = "rotate(0deg)";
             }
         }
 
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
+        // PDF Client-Side Text Parsing Engine
+        async function handlePdfFileUpload(e) {
+            const file = e.target.files[0];
+            const statusEl = document.getElementById("pdfStatus");
+            if (!file) return;
+
+            statusEl.innerText = "Extracting text from PDF via PDF.js...";
+            statusEl.className = "text-[11px] text-indigo-400 mt-1 animate-pulse";
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                let fullText = "";
+
+                for (let i = 1; i <= Math.min(pdf.numPages, 15); i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    const pageText = content.items.map(item => item.str).join(" ");
+                    fullText += pageText + "\n";
+                }
+
+                document.getElementById("customTitle").value = file.name.replace(".pdf", "");
+                document.getElementById("customText").value = fullText.substring(0, 4000) + "... [Truncated]";
+                statusEl.innerText = `Successfully extracted ${pdf.numPages} pages!`;
+                statusEl.className = "text-[11px] text-emerald-400 mt-1 font-semibold";
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Error parsing PDF. Please try again or paste raw text.";
+                statusEl.className = "text-[11px] text-rose-400 mt-1";
+            }
         }
 
-        function openParserModal() {
-            document.getElementById('parser-modal').classList.remove('hidden');
-            document.getElementById('parser-modal').classList.add('flex');
-        }
+        function processCustomPaper() {
+            const title = document.getElementById("customTitle").value || "Custom Economic Analysis";
+            const text = document.getElementById("customText").value;
 
-        function closeParserModal() {
-            document.getElementById('parser-modal').classList.remove('flex');
-            document.getElementById('parser-modal').classList.add('hidden');
-        }
+            if (!text) {
+                alert("Please upload a PDF or enter paper text first.");
+                return;
+            }
 
-        function handleCustomParse() {
-            const title = document.getElementById('input-title').value || 'Custom Parsed Working Paper (2026)';
-            const text = document.getElementById('input-text').value || 'User inputted abstract digest notes.';
-            
-            const newPaper = {
-                id: 'custom-' + Date.now(),
+            const customId = "custom-" + Date.now();
+            papersDB[customId] = {
+                id: customId,
                 title: title,
-                authors: 'Author et al.',
-                nber: 'NBER Working Paper (2026)',
+                authors: "User Uploaded Paper",
+                series: "Custom Parser",
+                year: "2026",
                 terms: [
-                    { term: 'Key Concept', def: 'Extracted automatically from abstract text.' },
-                    { term: 'Treatment Variable', def: 'Primary policy or shock identified in study.' }
+                    { term: "Parsed Document", def: "Client-side extraction completed via PDF.js." }
                 ],
-                deepTerms: 'Advanced methodological specification involving recursive error structures and asymptotic convergence proofs.',
                 findings: [
-                    text.substring(0, 120) + '...',
-                    'Demonstrates robust causal impact across standard econometric specifications.'
+                    "**Automated Summary:** " + text.substring(0, 250) + "..."
                 ],
-                deepFindings: 'Point estimates remain stable under alternative bandwidth selections and clustered variance estimators.',
                 techniques: [
-                    'Difference-in-Differences / Instrumental Variables estimation strategy.',
-                    'Fixed effects to control for unobserved heterogeneity.'
+                    "**Text Analysis:** Structured using standard econometrics digest protocol."
                 ],
-                deepTechniques: 'Employs generalized method of moments (GMM) with optimal weighting matrices.',
+                deepTechniques: "Full empirical decomposition pending LLM API integration.",
                 data: [
-                    'Administrative matched panel data.',
-                    'Survey and census aggregates.'
+                    "**User Source:** Extracted from uploaded document stream."
                 ],
-                deepData: 'Reconstruction requires merging granular microdata identifiers.',
                 model: [
-                    'Equilibrium framework with optimizing agents.',
-                    'Mapping empirical reduced-form coefficients to structural parameters.'
+                    "**Conceptual Model:** Evaluated against baseline Economic Model framework."
                 ],
-                deepModel: 'Dynamic stochastic general equilibrium setup with frictions.',
-                figures: [
-                    {
-                        figNum: 'Figure I',
-                        page: 'Page 12',
-                        title: 'Main Empirical Treatment Effect',
-                        desc: 'Normalized event study coefficients showing structural break post-intervention.',
-                        type: 'chart',
-                        chartId: 'chart-custom-1'
-                    }
-                ]
+                deepModel: "Detailed game theory parameterization available upon deep read.",
+                visuals: []
             };
 
-            papers.unshift(newPaper);
-            activePaperId = newPaper.id;
-            renderPaperList();
-            loadPaper(activePaperId);
-            closeParserModal();
-            document.getElementById('input-title').value = '';
-            document.getElementById('input-text').value = '';
+            closeUploadModal();
+            loadPaper(customId);
         }
 
-        window.onload = initApp;
+        function openUploadModal() { document.getElementById("uploadModal").classList.remove("hidden"); }
+        function closeUploadModal() { document.getElementById("uploadModal").classList.add("hidden"); }
+        function openSettingsModal() { document.getElementById("settingsModal").classList.remove("hidden"); }
+        function closeSettingsModal() { document.getElementById("settingsModal").classList.add("hidden"); }
+
+        function saveSettings() {
+            const key = document.getElementById("anthropicKey").value;
+            if (key) localStorage.setItem("anthropic_key", key);
+            closeSettingsModal();
+            alert("Settings saved!");
+        }
     </script>
 </body>
 </html>
